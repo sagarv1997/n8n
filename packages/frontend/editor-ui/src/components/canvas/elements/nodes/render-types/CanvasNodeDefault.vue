@@ -6,6 +6,8 @@ import { useCanvasNode } from '@/composables/useCanvasNode';
 import { NODE_INSERT_SPACER_BETWEEN_INPUT_GROUPS } from '@/constants';
 import type { CanvasNodeDefaultRender } from '@/types';
 import { useCanvas } from '@/composables/useCanvas';
+import CanvasNodeSettingsIcons from '@/components/canvas/elements/nodes/render-types/parts/CanvasNodeSettingsIcons.vue';
+import { useNodeHelpers } from '@/composables/useNodeHelpers';
 import { useNodeSettingsInCanvas } from '@/components/canvas/composables/useNodeSettingsInCanvas';
 import CanvasNodeNodeSettings from './parts/CanvasNodeNodeSettings.vue';
 
@@ -49,6 +51,7 @@ const {
 	connections,
 });
 
+const nodeHelpers = useNodeHelpers();
 const renderOptions = computed(() => render.value.options as CanvasNodeDefaultRender['options']);
 
 const nodeSettingsZoom = useNodeSettingsInCanvas();
@@ -157,6 +160,10 @@ function onActivate(event: MouseEvent) {
 		<template v-else>
 			<CanvasNodeTooltip v-if="renderOptions.tooltip" :visible="showTooltip" />
 			<NodeIcon :icon-source="iconSource" :size="iconSize" :shrink="false" :disabled="isDisabled" />
+			<CanvasNodeSettingsIcons
+				v-if="!isDisabled && !(hasPinnedData && !nodeHelpers.isProductionExecutionPreview.value)"
+				:class="$style.settingsIcons"
+			/>
 			<CanvasNodeStatusIcons v-if="!isDisabled" :class="$style.statusIcons" />
 			<CanvasNodeDisabledStrikeThrough v-if="isStrikethroughVisible" />
 			<div :class="$style.description">
@@ -366,5 +373,12 @@ function onActivate(event: MouseEvent) {
 	position: absolute;
 	bottom: var(--canvas-node--status-icons-offset);
 	right: var(--canvas-node--status-icons-offset);
+}
+.settingsIcons {
+	position: absolute;
+	bottom: var(--canvas-node--status-icons-offset);
+	left: var(--canvas-node--status-icons-offset);
+	display: flex;
+	gap: var(--spacing-4xs);
 }
 </style>
