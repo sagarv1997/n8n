@@ -215,6 +215,7 @@ export class FrontendService {
 			},
 			mfa: {
 				enabled: false,
+				enforced: false,
 			},
 			hideUsagePage: this.globalConfig.hideUsagePage,
 			license: {
@@ -383,6 +384,9 @@ export class FrontendService {
 		}
 
 		this.settings.mfa.enabled = this.globalConfig.mfa.enabled;
+
+		// TODO: read from settings
+		this.settings.mfa.enforced = true;
 
 		this.settings.executionMode = config.getEnv('executions.mode');
 
