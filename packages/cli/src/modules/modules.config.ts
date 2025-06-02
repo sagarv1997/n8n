@@ -10,7 +10,7 @@ export type ModulePreInit = {
 	shouldLoadModule: (ctx: ModulePreInitContext) => boolean;
 };
 
-const moduleNames = ['insights'] as const;
+const moduleNames = ['insights', 'community-nodes'] as const;
 export type ModuleName = (typeof moduleNames)[number];
 
 class Modules extends CommaSeparatedStringArray<ModuleName> {
@@ -36,11 +36,12 @@ export class ModulesConfig {
 	disabledModules: Modules = [];
 
 	// Default modules are always enabled unless explicitly disabled
-	private readonly defaultModules: ModuleName[] = ['insights'];
+	private readonly defaultModules: ModuleName[] = ['insights', 'community-nodes'];
 
 	// Loaded modules are the ones that have been loaded so far by the instance
 	readonly loadedModules = new Set<ModuleName>();
 
+	// TODO: can we add @Memoized here?
 	// Get all modules by merging default and enabled, and filtering out disabled modules
 	get modules(): ModuleName[] {
 		if (this.enabledModules.some((module) => this.disabledModules.includes(module))) {
@@ -54,5 +55,9 @@ export class ModulesConfig {
 
 	addLoadedModule(module: ModuleName) {
 		this.loadedModules.add(module);
+	}
+
+	hasEnabled(module: ModuleName) {
+		return this.modules.includes(module);
 	}
 }

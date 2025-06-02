@@ -8,6 +8,7 @@ import type { IWorkflowBase } from 'n8n-workflow';
 
 import config from '@/config';
 import { N8N_VERSION } from '@/constants';
+import { ModulesConfig } from '@/modules/modules.config';
 import { isApiEnabled } from '@/public-api';
 import {
 	ENV_VARS_DOCS_URL,
@@ -24,6 +25,7 @@ export class InstanceRiskReporter implements RiskReporter {
 		private readonly instanceSettings: InstanceSettings,
 		private readonly logger: Logger,
 		private readonly globalConfig: GlobalConfig,
+		private readonly modulesConfig: ModulesConfig,
 	) {}
 
 	async report(workflows: IWorkflowBase[]) {
@@ -89,7 +91,7 @@ export class InstanceRiskReporter implements RiskReporter {
 		const settings: Record<string, unknown> = {};
 
 		settings.features = {
-			communityPackagesEnabled: this.globalConfig.nodes.communityPackages.enabled,
+			communityPackagesEnabled: this.modulesConfig.hasEnabled('community-nodes'),
 			versionNotificationsEnabled: this.globalConfig.versionNotifications.enabled,
 			templatesEnabled: this.globalConfig.templates.enabled,
 			publicApiEnabled: isApiEnabled(),

@@ -16,7 +16,6 @@ import { Push } from '@/push';
 import { Publisher } from '@/scaling/pubsub/publisher.service';
 import { Subscriber } from '@/scaling/pubsub/subscriber.service';
 import { ScalingService } from '@/scaling/scaling.service';
-import { CommunityPackagesService } from '@/services/community-packages.service';
 import { TaskBrokerServer } from '@/task-runners/task-broker/task-broker-server';
 import { TaskRunnerProcess } from '@/task-runners/task-runner-process';
 import { Telemetry } from '@/telemetry';
@@ -29,7 +28,6 @@ config.set('binaryDataManager.availableModes', 'filesystem');
 Container.get(TaskRunnersConfig).enabled = true;
 mockInstance(LoadNodesAndCredentials);
 const binaryDataService = mockInstance(BinaryDataService);
-const communityPackagesService = mockInstance(CommunityPackagesService);
 const externalHooks = mockInstance(ExternalHooks);
 const externalSecretsManager = mockInstance(ExternalSecretsManager);
 const license = mockInstance(License, { loadCertStr: async () => '' });
@@ -52,7 +50,6 @@ test('worker initializes all its components', async () => {
 
 	expect(license.init).toHaveBeenCalledTimes(1);
 	expect(binaryDataService.init).toHaveBeenCalledTimes(1);
-	expect(communityPackagesService.init).toHaveBeenCalledTimes(1);
 	expect(externalHooks.init).toHaveBeenCalledTimes(1);
 	expect(externalSecretsManager.init).toHaveBeenCalledTimes(1);
 	expect(messageEventBus.initialize).toHaveBeenCalledTimes(1);

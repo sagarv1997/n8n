@@ -18,6 +18,7 @@ export const LOG_SCOPES = [
 	'task-runner',
 	'insights',
 	'workflow-activation',
+	'community-nodes',
 ] as const;
 
 export type LogScope = (typeof LOG_SCOPES)[number];
