@@ -1,0 +1,312 @@
+name: 'SBOM Generation and Attestation'
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: 'Release version'
+        required: true
+        type: string
+      docker-image-name:
+        description: 'Docker image name (without tag)'
+        required: true
+        type: string
+      docker-image-digest:
+        description: 'Docker image digest'
+        required: false
+        type: string
+      npm-package-paths:
+        description: 'Paths to NPM packages (JSON array)'
+        required: true
+        type: string
+      dockerfile-path:
+        description: 'Path to Dockerfile'
+        required: false
+        type: string
+        default: 'docker/images/n8n/Dockerfile'
+      skip-docker-sbom:
+        description: 'Skip Docker SBOM generation'
+        required: false
+        type: boolean
+        default: false
+      test-mode:
+        description: 'Test mode - skip publishing steps'
+        required: false
+        type: boolean
+        default: false
+    secrets:
+      AIKIDO_API_KEY:
+        description: 'Aikido API key for SBOM generation'
+        required: true
+    outputs:
+      npm-sbom-path:
+        description: 'Path to NPM SBOM file'
+        value: ${{ jobs.generate-sbom.outputs.npm-sbom-path }}
+      docker-sbom-path:
+        description: 'Path to Docker SBOM file'
+        value: ${{ jobs.generate-sbom.outputs.docker-sbom-path }}
+      security-report-npm:
+        description: 'Path to NPM security report'
+        value: ${{ jobs.validate-sbom.outputs.npm-security-report }}
+      security-report-docker:
+        description: 'Path to Docker security report'
+        value: ${{ jobs.validate-sbom.outputs.docker-security-report }}
+
+jobs:
+  generate-sbom:
+    name: Generate SBOMs
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    env:
+      AIKIDO_API_KEY: ${{ secrets.AIKIDO_API_KEY }}
+    outputs:
+      npm-sbom-path: ${{ steps.generate-npm-sbom.outputs.sbom-path }}
+      docker-sbom-path: ${{ steps.generate-docker-sbom.outputs.sbom-path }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22.x
+
+      - name: Setup corepack and pnpm
+        run: |
+          npm i -g corepack@0.33
+          corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Aikido CLI
+        run: |
+          curl -sSL https://download.aikido.dev/cli/install.sh | sh
+          sudo mv aikido-cli /usr/local/bin/
+          aikido-cli --version
+
+      - name: Generate NPM SBOM
+        id: generate-npm-sbom
+        run: |
+          echo "Generating SBOM for NPM packages..."
+
+          # Generate CycloneDX SBOM with VEX for NPM packages
+          aikido-cli sbom generate \
+            --format cyclonedx \
+            --output-file sbom-npm-${{ inputs.version }}.json \
+            --include-vex \
+            --project-path . \
+            --build-info "version=${{ inputs.version }},build=${{ github.sha }},workflow=${{ github.workflow }},type=npm"
+
+          echo "sbom-path=sbom-npm-${{ inputs.version }}.json" >> $GITHUB_OUTPUT
+
+          # Validate the generated SBOM
+          echo "Validating NPM SBOM..."
+          aikido-cli sbom validate sbom-npm-${{ inputs.version }}.json
+
+      - name: Generate Docker SBOM
+        id: generate-docker-sbom
+        if: ${{ !inputs.skip-docker-sbom }}
+        run: |
+          echo "Generating SBOM for Docker image..."
+
+          # If we have a Docker image available, scan it directly
+          if [ -n "${{ inputs.docker-image-digest }}" ]; then
+            echo "Scanning existing Docker image: ${{ inputs.docker-image-name }}@${{ inputs.docker-image-digest }}"
+
+            aikido-cli sbom generate \
+              --format cyclonedx \
+              --output-file sbom-docker-${{ inputs.version }}.json \
+              --include-vex \
+              --docker-image "${{ inputs.docker-image-name }}@${{ inputs.docker-image-digest }}" \
+              --build-info "version=${{ inputs.version }},build=${{ github.sha }},digest=${{ inputs.docker-image-digest }},type=docker"
+          else
+            echo "No Docker image digest provided, generating SBOM from Dockerfile context..."
+
+            aikido-cli sbom generate \
+              --format cyclonedx \
+              --output-file sbom-docker-${{ inputs.version }}.json \
+              --include-vex \
+              --dockerfile-path ${{ inputs.dockerfile-path }} \
+              --project-path . \
+              --build-info "version=${{ inputs.version }},build=${{ github.sha }},dockerfile=${{ inputs.dockerfile-path }},type=docker"
+          fi
+
+          echo "sbom-path=sbom-docker-${{ inputs.version }}.json" >> $GITHUB_OUTPUT
+
+          # Validate the generated SBOM
+          echo "Validating Docker SBOM..."
+          aikido-cli sbom validate sbom-docker-${{ inputs.version }}.json
+
+      - name: Upload SBOM artifacts
+        uses: actions/upload-artifact@c7d193f32edcb7bfad88892161225aeda64e9392 # v4.0.0
+        with:
+          name: sboms-${{ inputs.version }}
+          path: |
+            sbom-npm-${{ inputs.version }}.json
+            sbom-docker-${{ inputs.version }}.json
+          retention-days: 90
+
+      - name: Display SBOM summaries
+        run: |
+          echo "=== NPM SBOM Summary ==="
+          if [ -f "sbom-npm-${{ inputs.version }}.json" ]; then
+            echo "📦 NPM SBOM generated successfully"
+            echo "Components: $(jq '.components | length' sbom-npm-${{ inputs.version }}.json)"
+            echo "Vulnerabilities: $(jq '.vulnerabilities | length // 0' sbom-npm-${{ inputs.version }}.json)"
+            echo "Size: $(du -h sbom-npm-${{ inputs.version }}.json | cut -f1)"
+          fi
+
+          echo ""
+          echo "=== Docker SBOM Summary ==="
+          if [ -f "sbom-docker-${{ inputs.version }}.json" ]; then
+            echo "🐳 Docker SBOM generated successfully"
+            echo "Components: $(jq '.components | length' sbom-docker-${{ inputs.version }}.json)"
+            echo "Vulnerabilities: $(jq '.vulnerabilities | length // 0' sbom-docker-${{ inputs.version }}.json)"
+            echo "Size: $(du -h sbom-docker-${{ inputs.version }}.json | cut -f1)"
+          fi
+
+  generate-attestations:
+    name: Generate Attestations
+    needs: [generate-sbom]
+    runs-on: ubuntu-latest
+    if: ${{ !inputs.test-mode }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+
+      - name: Download SBOM artifacts
+        uses: actions/download-artifact@f44cd7b40bfd40b6aa1cc1b9b5b7bf03d3d64cf2 # v4.1.0
+        with:
+          name: sboms-${{ inputs.version }}
+
+      - name: Parse NPM package paths
+        id: parse-paths
+        run: |
+          echo 'npm-paths<<EOF' >> $GITHUB_OUTPUT
+          echo '${{ inputs.npm-package-paths }}' | jq -r '.[]' >> $GITHUB_OUTPUT
+          echo 'EOF' >> $GITHUB_OUTPUT
+
+      - name: Generate NPM package attestations
+        if: ${{ needs.generate-sbom.outputs.npm-sbom-path }}
+        uses: actions/attest-build-provenance@1c608d11d69870c2092266b3f9a6f3abbf17002c # v1.4.3
+        with:
+          subject-path: ${{ steps.parse-paths.outputs.npm-paths }}
+
+      - name: Generate NPM SBOM attestation
+        if: ${{ needs.generate-sbom.outputs.npm-sbom-path }}
+        uses: actions/attest-sbom@5026d3663739160db546203eeaffa6aa1c51a4d6 # v1.4.1
+        with:
+          subject-path: ${{ steps.parse-paths.outputs.npm-paths }}
+          sbom-path: ${{ needs.generate-sbom.outputs.npm-sbom-path }}
+
+      - name: Generate Docker image attestations
+        if: ${{ !inputs.skip-docker-sbom && inputs.docker-image-digest }}
+        uses: actions/attest-build-provenance@1c608d11d69870c2092266b3f9a6f3abbf17002c # v1.4.3
+        with:
+          subject-name: ${{ inputs.docker-image-name }}
+          subject-digest: ${{ inputs.docker-image-digest }}
+
+      - name: Generate Docker SBOM attestation
+        if: ${{ !inputs.skip-docker-sbom && inputs.docker-image-digest && needs.generate-sbom.outputs.docker-sbom-path }}
+        uses: actions/attest-sbom@5026d3663739160db546203eeaffa6aa1c51a4d6 # v1.4.1
+        with:
+          subject-name: ${{ inputs.docker-image-name }}
+          subject-digest: ${{ inputs.docker-image-digest }}
+          sbom-path: ${{ needs.generate-sbom.outputs.docker-sbom-path }}
+
+  validate-sbom:
+    name: Validate and Analyze SBOMs
+    needs: [generate-sbom]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      AIKIDO_API_KEY: ${{ secrets.AIKIDO_API_KEY }}
+    outputs:
+      npm-security-report: ${{ steps.security-analysis.outputs.npm-report }}
+      docker-security-report: ${{ steps.security-analysis.outputs.docker-report }}
+
+    steps:
+      - name: Download SBOM artifacts
+        uses: actions/download-artifact@f44cd7b40bfd40b6aa1cc1b9b5b7bf03d3d64cf2 # v4.1.0
+        with:
+          name: sboms-${{ inputs.version }}
+
+      - name: Install Aikido CLI
+        run: |
+          curl -sSL https://download.aikido.dev/cli/install.sh | sh
+          sudo mv aikido-cli /usr/local/bin/
+
+      - name: Security analysis
+        id: security-analysis
+        run: |
+          echo "Running security analysis..."
+
+          # Analyze NPM SBOM
+          if [ -f "sbom-npm-${{ inputs.version }}.json" ]; then
+            echo "🔍 Analyzing NPM SBOM for security vulnerabilities..."
+            aikido-cli security scan \
+              --sbom sbom-npm-${{ inputs.version }}.json \
+              --format json \
+              --output npm-security-report-${{ inputs.version }}.json || true
+
+            echo "npm-report=npm-security-report-${{ inputs.version }}.json" >> $GITHUB_OUTPUT
+          fi
+
+          # Analyze Docker SBOM
+          if [ -f "sbom-docker-${{ inputs.version }}.json" ]; then
+            echo "🔍 Analyzing Docker SBOM for security vulnerabilities..."
+            aikido-cli security scan \
+              --sbom sbom-docker-${{ inputs.version }}.json \
+              --format json \
+              --output docker-security-report-${{ inputs.version }}.json || true
+
+            echo "docker-report=docker-security-report-${{ inputs.version }}.json" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate security summary
+        run: |
+          echo "# 🛡️ Security Analysis Summary" >> security-summary.md
+          echo "" >> security-summary.md
+
+          if [ -f "npm-security-report-${{ inputs.version }}.json" ]; then
+            echo "## NPM Package Security" >> security-summary.md
+            VULNERABILITIES=$(jq '.vulnerabilities | length' npm-security-report-${{ inputs.version }}.json 2>/dev/null || echo "0")
+            echo "- Vulnerabilities found: $VULNERABILITIES" >> security-summary.md
+            echo "" >> security-summary.md
+          fi
+
+          if [ -f "docker-security-report-${{ inputs.version }}.json" ]; then
+            echo "## Docker Image Security" >> security-summary.md
+            VULNERABILITIES=$(jq '.vulnerabilities | length' docker-security-report-${{ inputs.version }}.json 2>/dev/null || echo "0")
+            echo "- Vulnerabilities found: $VULNERABILITIES" >> security-summary.md
+            echo "" >> security-summary.md
+          fi
+
+          echo "Generated at: $(date)" >> security-summary.md
+
+          # Display summary
+          cat security-summary.md
+
+      - name: Upload security reports
+        uses: actions/upload-artifact@c7d193f32edcb7bfad88892161225aeda64e9392 # v4.0.0
+        with:
+          name: security-reports-${{ inputs.version }}
+          path: |
+            npm-security-report-${{ inputs.version }}.json
+            docker-security-report-${{ inputs.version }}.json
+            security-summary.md
+          retention-days: 90
