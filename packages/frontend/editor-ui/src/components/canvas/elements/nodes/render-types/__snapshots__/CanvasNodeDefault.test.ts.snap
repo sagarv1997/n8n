@@ -81,14 +81,7 @@ exports[`CanvasNodeDefault > configuration > should render configurable configur
       
     </div>
   </div>
-  <div
-    class="settingIcons"
-  >
-    <!--v-if-->
-    <!--v-if-->
-    <!--v-if-->
-    <!--v-if-->
-  </div>
+  <!--v-if-->
   <!--v-if-->
   <!--v-if-->
   <div
@@ -136,14 +129,7 @@ exports[`CanvasNodeDefault > configuration > should render configuration node co
       
     </div>
   </div>
-  <div
-    class="settingIcons"
-  >
-    <!--v-if-->
-    <!--v-if-->
-    <!--v-if-->
-    <!--v-if-->
-  </div>
+  <!--v-if-->
   <!--v-if-->
   <!--v-if-->
   <div
