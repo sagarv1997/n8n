@@ -180,12 +180,13 @@ const mainMenuItems = computed(() => [
 		notification: true,
 		label: i18n.baseText('mainSidebar.whatsNew'),
 		position: 'bottom',
+		available: versionsStore.whatsNewArticles.length > 0,
 		children: [
 			...versionsStore.whatsNewArticles.map((article) => ({
 				id: `whats-new-article-${article.id}`,
 				label: article.title,
 				unread: true,
-				compact: true,
+				size: 'small',
 			})),
 			{
 				id: 'full-changelog',
@@ -195,7 +196,8 @@ const mainMenuItems = computed(() => [
 					href: 'https://docs.n8n.io/release-notes/',
 					target: '_blank',
 				},
-				compact: true,
+				size: 'small',
+				customIconSize: 'small',
 			},
 		],
 	},
