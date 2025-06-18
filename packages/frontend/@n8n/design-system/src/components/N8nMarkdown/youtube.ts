@@ -9,8 +9,8 @@ export const YOUTUBE_EMBED_SRC_REGEX =
 	/^https:\/\/(?:www\.)?(youtube\.com|youtube-nocookie\.com)\/embed\/[\w-]{11}(?:\?.*)?$/i;
 
 export interface YoutubeEmbedConfig {
-	width?: number;
-	height?: number;
+	width?: number | string;
+	height?: number | string;
 	title?: string;
 	nocookie?: boolean;
 }
