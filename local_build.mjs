@@ -1,6 +1,7 @@
 #!/usr/bin/env zx
 
 import { $, echo, fs, chalk, spinner } from 'zx';
+import path from 'path';
 
 // Disable verbose mode for cleaner output
 $.verbose = false;
@@ -189,6 +190,67 @@ startTimer('package_deploy');
 await fs.ensureDir(config.compiledAppDir);
 
 await $`NODE_ENV=production DOCKER_BUILD=true pnpm --filter=n8n --prod --legacy deploy ${config.compiledAppDir}`;
+
+// Inject Linux binaries for Docker compatibility
+echo(chalk.yellow('INFO: Injecting Linux native binaries for Docker compatibility...'));
+
+const injectLinuxBinaries = async () => {
+	const canvasPath = path.join(config.compiledAppDir, 'node_modules/@napi-rs/canvas');
+
+	if (!(await fs.pathExists(canvasPath))) {
+		echo(chalk.yellow('WARNING: @napi-rs/canvas not found, skipping Linux binary injection'));
+		return;
+	}
+
+	const tempDir = path.join(config.compiledAppDir, '.linux-binaries-temp');
+	await fs.ensureDir(tempDir);
+
+	try {
+		const packages = [
+			'@napi-rs/canvas-linux-x64-musl@0.1.70',
+			'@napi-rs/canvas-linux-arm64-musl@0.1.70',
+		];
+
+		for (const pkg of packages) {
+			echo(chalk.gray(`  → Downloading ${pkg}...`));
+
+			// Download the package
+			await $`cd ${tempDir} && npm pack ${pkg} --quiet`;
+
+			// Find the downloaded .tgz file
+			const files = await fs.readdir(tempDir);
+			const tgzFile = files.find((f) => f.endsWith('.tgz') && f.includes(pkg.split('@')[1]));
+
+			if (tgzFile) {
+				// Extract it
+				await $`cd ${tempDir} && tar -xzf ${tgzFile}`;
+
+				// Find and copy .node files
+				const packageDir = path.join(tempDir, 'package');
+				const nodeFiles = await fs.readdir(packageDir);
+
+				for (const file of nodeFiles) {
+					if (file.endsWith('.node')) {
+						await fs.copy(path.join(packageDir, file), path.join(canvasPath, file));
+						echo(chalk.gray(`  → Injected ${file}`));
+					}
+				}
+
+				// Clean up for next iteration
+				await fs.remove(packageDir);
+				await fs.remove(path.join(tempDir, tgzFile));
+			}
+		}
+
+		echo(chalk.green('✅ Linux native binaries injected successfully'));
+	} catch (error) {
+		echo(chalk.red(`ERROR: Failed to inject Linux binaries: ${error.message}`));
+	} finally {
+		await fs.remove(tempDir);
+	}
+};
+
+await injectLinuxBinaries();
 
 const packageDeployTime = getElapsedTime('package_deploy');
 
