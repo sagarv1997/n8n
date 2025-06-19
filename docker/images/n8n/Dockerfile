@@ -1,7 +1,8 @@
 ARG NODE_VERSION=22
 ARG N8N_VERSION=snapshot
-ARG LAUNCHER_VERSION=1.1.2
-ARG BUILDER_PLATFORM_ARG=linux/amd64
+ARG LAUNCHER_VERSION=1.1.3
+ARG TARGETPLATFORM
+
 
 # ==============================================================================
 # STAGE 1: System Dependencies & Base Setup
@@ -33,7 +34,6 @@ COPY .npmrc /usr/local/etc/npmrc
 RUN npm install -g \
         corepack@0.31 \
         full-icu@1.5.0 \
-        npm@11.4.1 \
     && corepack enable pnpm \
     && rm -rf /root/.npm /root/.cache
 
@@ -41,22 +41,18 @@ RUN npm install -g \
 # STAGE 2: Application Artifact Processor
 # A clean intermediate stage to hold pre-built application artifacts from the build context.
 # ==============================================================================
-FROM --platform=${BUILDER_PLATFORM_ARG} system-deps AS app-artifact-processor
+FROM system-deps AS app-artifact-processor
 
-COPY ./compiled_app_output /app/
+COPY ./compiled /app/
 
 # ==============================================================================
 # STAGE 3: Task Runner Launcher (Multi-platform)
 # This stage specifically prepares the launcher.
-# NOTE: The base image (`system-deps`) should provide `wget` for downloading.
-# If `wget` is not guaranteed in `system-deps`, it should be installed here.
+
 # ==============================================================================
 FROM system-deps AS launcher-downloader
 ARG TARGETPLATFORM
 ARG LAUNCHER_VERSION
-# Ensure wget is installed specifically for this stage if not guaranteed by system-deps.
-# Current system-deps includes wget, so this is illustrative:
-# RUN apk add --no-cache wget
 
 RUN set -e; \
     case "$TARGETPLATFORM" in \
@@ -104,7 +100,6 @@ RUN cd /usr/local/lib/node_modules/n8n && \
     ln -s /usr/local/lib/node_modules/n8n/bin/n8n /usr/local/bin/n8n && \
     mkdir -p /home/node/.n8n && \
     chown -R node:node /home/node && \
-    apk del apk-tools && \
     rm -rf /var/cache/apk/* /lib/apk/db/* /etc/apk/
 
 EXPOSE 5678/tcp

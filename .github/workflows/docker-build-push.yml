@@ -65,25 +65,8 @@ jobs:
         uses: ./.github/actions/setup-and-build
         id: app_build
 
-      - name: Perform Pre-Deploy Cleanup
-        run: |
-          echo "Running .github/scripts/trim-fe-packageJson.js..."
-          node .github/scripts/trim-fe-packageJson.js
-          echo "Performing pre-deploy cleanup on package.json files..."
-          if [ -f "./package.json" ]; then
-            jq '.pnpm.patchedDependencies |= with_entries(select(.key | startswith("pdfjs-dist") or startswith("pkce-challenge")))' package.json > package.json.tmp; mv package.json.tmp package.json
-            echo "  Applied jq patch to root package.json"
-          fi
-          echo "Cleanup scripts applied."
-        shell: bash
-
-      - name: Create Pruned n8n Deployment for Docker
-        run: |
-          echo "Creating pruned production deployment in ./compiled_app_output..."
-          rm -rf ./compiled_app_output
-          mkdir -p ./compiled_app_output
-          NODE_ENV=production DOCKER_BUILD=true \
-            pnpm --filter=n8n --prod --no-optional --legacy deploy ./compiled_app_output
+      - name: Build n8n for Docker
+        run: pnpm build:n8n
         shell: bash
 
       - name: Determine build context values

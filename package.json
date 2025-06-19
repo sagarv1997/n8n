@@ -14,6 +14,9 @@
     "build:backend": "turbo run build:backend",
     "build:frontend": "turbo run build:frontend",
     "build:nodes": "turbo run build:nodes",
+    "build:n8n": "node scripts/build-n8n.mjs",
+    "build:docker": "node scripts/build-n8n.mjs && node scripts/dockerize-n8n.mjs",
+    "build:docker:scan": "node scripts/build-n8n.mjs && node scripts/dockerize-n8n.mjs && node scripts/scan-n8n-image.mjs",
     "typecheck": "turbo typecheck",
     "dev": "turbo run dev --parallel --env-mode=loose --filter=!@n8n/design-system --filter=!@n8n/chat --filter=!@n8n/task-runner",
     "dev:be": "turbo run dev --parallel --env-mode=loose --filter=!@n8n/design-system --filter=!@n8n/chat --filter=!@n8n/task-runner --filter=!n8n-editor-ui",
@@ -106,13 +109,6 @@
       "vue-tsc@2.2.8": "patches/vue-tsc@2.2.8.patch",
       "eslint-plugin-n8n-local-rules": "patches/eslint-plugin-n8n-local-rules.patch",
       "element-plus@2.4.3": "patches/element-plus@2.4.3.patch"
-    },
-    "packageExtensions": {
-      "pdfjs-dist": {
-        "dependencies": {
-          "@napi-rs/canvas": "*"
-        }
-      }
     }
   }
 }
