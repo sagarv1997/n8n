@@ -5,7 +5,7 @@ import { onClickOutside, type VueInstance } from '@vueuse/core';
 
 import { useI18n } from '@n8n/i18n';
 import { N8nNavigationDropdown, N8nTooltip, N8nLink, N8nIconButton } from '@n8n/design-system';
-import { ABOUT_MODAL_KEY, VERSIONS_MODAL_KEY, VIEWS, WHATS_NEW_MODAL_KEY } from '@/constants';
+import { ABOUT_MODAL_KEY, VIEWS, WHATS_NEW_MODAL_KEY } from '@/constants';
 import { hasPermission } from '@/utils/rbac/permissions';
 import { useCloudPlanStore } from '@/stores/cloudPlan.store';
 import { useRootStore } from '@n8n/stores/useRootStore';
@@ -179,7 +179,7 @@ const mainMenuItems = computed(() => [
 		notification: true,
 		label: i18n.baseText('mainSidebar.whatsNew'),
 		position: 'bottom',
-		available: hasVersionUpdates.value || versionsStore.whatsNewArticles.length > 0,
+		available: versionsStore.hasVersionUpdates || versionsStore.whatsNewArticles.length > 0,
 		children: [
 			...versionsStore.whatsNewArticles.map((article) => ({
 				id: `whats-new-article-${article.id}`,
@@ -205,7 +205,7 @@ const mainMenuItems = computed(() => [
 			{
 				id: 'version-upgrade-cta',
 				component: VersionUpdateCTA,
-				available: hasVersionUpdates.value,
+				available: versionsStore.hasVersionUpdates,
 				props: {},
 			},
 		],
@@ -214,10 +214,6 @@ const mainMenuItems = computed(() => [
 const createBtn = ref<InstanceType<typeof N8nNavigationDropdown>>();
 
 const isCollapsed = computed(() => uiStore.sidebarMenuCollapsed);
-
-const hasVersionUpdates = computed(
-	() => settingsStore.settings.releaseChannel === 'stable' && versionsStore.hasVersionUpdates,
-);
 
 const showUserArea = computed(() => hasPermission(['authenticated']));
 const userIsTrialing = computed(() => cloudPlanStore.userIsTrialing);
