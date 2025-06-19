@@ -66,6 +66,14 @@ const userMenuItems = ref([
 	},
 ]);
 
+const showWhatsNewNotification = computed(
+	() =>
+		versionsStore.hasVersionUpdates ||
+		versionsStore.whatsNewArticles.some(
+			(article) => !versionsStore.isWhatsNewArticleRead(article.id),
+		),
+);
+
 const mainMenuItems = computed(() => [
 	{
 		id: 'cloud-admin',
@@ -176,7 +184,7 @@ const mainMenuItems = computed(() => [
 	{
 		id: 'whats-new',
 		icon: 'bell',
-		notification: true,
+		notification: showWhatsNewNotification.value,
 		label: i18n.baseText('mainSidebar.whatsNew'),
 		position: 'bottom',
 		available: versionsStore.hasVersionUpdates || versionsStore.whatsNewArticles.length > 0,
@@ -187,7 +195,7 @@ const mainMenuItems = computed(() => [
 				size: 'small',
 				icon: {
 					type: 'emoji',
-					value: '•',
+					value: !versionsStore.isWhatsNewArticleRead(article.id) ? '•' : '',
 					color: 'primary',
 				},
 			})),
