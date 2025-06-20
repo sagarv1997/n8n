@@ -37,6 +37,7 @@ const emit = defineEmits<{
 }>();
 
 const i18n = useI18n();
+const ndvStore = useNDVStore();
 
 const isDefault = computed(() => props.parameter.default === props.value);
 const isValueAnExpression = computed(() => isValueExpression(props.parameter, props.value));
@@ -64,7 +65,7 @@ const shouldShowOptions = computed(() => {
 	return false;
 });
 const selectedView = computed(() => (isValueAnExpression.value ? 'expression' : 'fixed'));
-const activeNode = computed(() => useNDVStore().activeNode);
+const activeNode = computed(() => ndvStore.activeNode);
 const hasRemoteMethod = computed(
 	() =>
 		!!props.parameter.typeOptions?.loadOptionsMethod || !!props.parameter.typeOptions?.loadOptions,
@@ -91,13 +92,21 @@ const actions = computed(() => {
 		];
 	}
 
-	const parameterActions = [
-		{
-			label: resetValueLabel.value,
-			value: 'resetValue',
-			disabled: isDefault.value,
-		},
-	];
+	// what about type code?
+	const hasFocusAction = props.parameter.type === 'string' || props.parameter.type === 'json';
+	const focusAction = {
+		label: 'Focus parameter', // TODO: add to translations
+		value: 'focus',
+		disabled: ndvStore.focusPanelActive,
+	};
+
+	const resetAction = {
+		label: resetValueLabel.value,
+		value: 'resetValue',
+		disabled: isDefault.value,
+	};
+
+	const parameterActions = hasFocusAction ? [resetAction, focusAction] : [resetAction];
 
 	if (
 		hasRemoteMethod.value ||
