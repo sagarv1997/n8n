@@ -240,7 +240,7 @@ export class LmChatXAiGrok implements INodeType {
 			timeout: options.timeout ?? 60000,
 			maxRetries: options.maxRetries ?? 2,
 			configuration,
-			callbacks: [new N8nLlmTracing(this)],
+			callbacks: [],
 			modelKwargs: {
 				stream_options: undefined,
 				...(options.responseFormat
